@@ -95,6 +95,14 @@ function saveGraph(graph: Graph): void {
   writeFileSync(MEMORY_FILE, lines.join("\n") + "\n", "utf-8")
 }
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+// Claude Code serializes array/object args as JSON strings — unwrap if needed
+function arr(val: any): any[] {
+  if (typeof val === "string") return JSON.parse(val)
+  return val ?? []
+}
+
 // ── Graph mutations ────────────────────────────────────────────────────────
 
 function createEntities(input: Omit<Entity, "last_seen">[]): Entity[] {
@@ -430,31 +438,31 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   try {
     switch (name) {
       case "create_entities": {
-        const created = createEntities(args!.entities as Omit<Entity, "last_seen">[])
+        const created = createEntities(arr(args!.entities))
         return { content: [{ type: "text", text: JSON.stringify(created, null, 2) }] }
       }
       case "create_relations": {
-        const created = createRelations(args!.relations as Relation[])
+        const created = createRelations(arr(args!.relations))
         return { content: [{ type: "text", text: JSON.stringify(created, null, 2) }] }
       }
       case "add_observations": {
-        const results = addObservations(args!.observations as { entityName: string; contents: string[] }[])
+        const results = addObservations(arr(args!.observations))
         return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] }
       }
       case "delete_entities": {
-        deleteEntities(args!.entityNames as string[])
+        deleteEntities(arr(args!.entityNames))
         return { content: [{ type: "text", text: "Entities deleted." }] }
       }
       case "delete_observations": {
-        deleteObservations(args!.deletions as { entityName: string; observations: string[] }[])
+        deleteObservations(arr(args!.deletions))
         return { content: [{ type: "text", text: "Observations deleted." }] }
       }
       case "delete_relations": {
-        deleteRelations(args!.relations as Relation[])
+        deleteRelations(arr(args!.relations))
         return { content: [{ type: "text", text: "Relations deleted." }] }
       }
       case "open_nodes": {
-        const result = openNodes(args!.names as string[])
+        const result = openNodes(arr(args!.names))
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }
       }
       case "search_nodes": {
