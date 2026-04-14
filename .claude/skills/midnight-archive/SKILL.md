@@ -41,25 +41,31 @@ json.dump(d, open(path, 'w'), indent=2)
 fi
 ```
 
-### 步驟 3：送出 !archive 到 tmux session
+### 步驟 3：取得 PID、送出 !archive、背景監聽恢復
+
+先取得 main session 的 Claude PID，再送出 !archive，最後在背景等待該 PID 消失後立即還原 access.json：
 
 ```bash
 TMUX_TARGET="${ARGUMENTS:-assistant:0.0}"
+ACCESS_FILE="$HOME/.claude/channels/discord/access.json"
+
+# 取 main session 的 claude PID（透過 tmux pane pid 找子程序）
+PANE_PID=$(tmux list-panes -t "$TMUX_TARGET" -F "#{pane_pid}" 2>/dev/null | head -1)
+CLAUDE_PID=$(pgrep -P "$PANE_PID" -x claude 2>/dev/null | head -1)
+echo "Main session PID: ${CLAUDE_PID:-unknown}"
+
+# 送出 !archive
 tmux send-keys -t "$TMUX_TARGET" "!archive" Enter
 echo "Sent !archive to $TMUX_TARGET"
-```
 
-### 步驟 4：背景恢復 Discord 存取
-
-在背景等待 120 秒後還原 access.json（足夠讓 archive + Claude 重啟完成）：
-
-```bash
-ACCESS_FILE="$HOME/.claude/channels/discord/access.json"
+# 背景：等 PID 消失後立即還原（不固定等 120 秒）
 (
-  sleep 120
+  if [ -n "$CLAUDE_PID" ]; then
+    while kill -0 "$CLAUDE_PID" 2>/dev/null; do sleep 1; done
+  fi
   cp "${ACCESS_FILE}.bak" "$ACCESS_FILE"
-  echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Discord access restored" >> /tmp/midnight-archive.log
+  echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Discord access restored (PID ${CLAUDE_PID:-unknown} exited)" >> /tmp/midnight-archive.log
 ) &
 disown
-echo "Restore scheduled in 120s"
+echo "Restore watching PID ${CLAUDE_PID:-unknown}"
 ```
